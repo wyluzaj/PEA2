@@ -42,14 +42,7 @@ int runApplication(
         }
 
         TSPInstance instance = loadInstance(inputPath);
-        if (instance.dimension > 64) {
-            std::cout << "Rozmiar instancji (" << instance.dimension
-                      << ") przekracza 64 miasta.\n"
-                      << "Program zoptymalizowany pod katem B&B (maska bitowa) obsluguje max n=64.\n"
-                      << "Dla metod dokladnych bariera czasu (15 min) nastepuje znacznie wczesniej.\n"
-                      << "Przerywam przedwczesnie.\n";
-            return 0;
-        }
+
         if (instance.name.empty()) {
             instance.name = getFileNameWithoutExtension(inputPath);
         }

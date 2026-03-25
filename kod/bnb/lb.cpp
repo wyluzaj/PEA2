@@ -4,12 +4,14 @@
 #include <limits>
 #include <stdexcept>
 #include <vector>
+
 #include "../common/config.h"
+
 namespace {
     constexpr int INF = std::numeric_limits<int>::max() / 8;
 
     bool isInternalVisitedVertex(const BnBNode& node, int v) {
-        if (!(node.visited_mask & (1ULL << v))) {
+        if (!node.visited[v]) {
             return false;
         }
 
@@ -72,7 +74,7 @@ namespace {
         long long sum = 0;
         int found = 0;
 
-        // BŁYSKAWICZNE SZUKANIE: Iterujemy po gotowej, posortowanej liście sąsiadów
+        // BŁYSKAWICZNE SZUKANIE: Iterujemy po gotowej, posortowanej liście sąsiadów (złożoność ok. O(1))
         for (int u : instance.sortedNeighbors[v]) {
             if (!isResidualEdgeAllowed(node, v, u, remainingDegree, n)) {
                 continue;
@@ -101,7 +103,7 @@ namespace {
 
         // Nieodwiedzone wierzchołki muszą mieć finalnie stopień 2
         for (int v = 0; v < n; ++v) {
-            if (!(node.visited_mask & (1ULL << v))) {
+            if (!node.visited[v]) {
                 remainingDegree[v] = 2;
             }
         }
@@ -146,40 +148,122 @@ namespace {
         return static_cast<int>(total);
     }
 
-// -------------------- ATSP helpers --------------------
+    // -------------------- ATSP helpers --------------------
 
     int minOutgoingToUnvisitedOrStart(
             const TSPInstance& instance,
             int from,
-            uint64_t visited_mask // Zmieniono z std::vector<bool>
+            const std::vector<bool>& visited
     ) {
-        for (int to : instance.sortedNeighbors[from]) {
-            // Sprawdzenie bitowe zamiast tablicy
-            if (!(visited_mask & (1ULL << to)) || to == Config::START_VERTEX) {
-                return instance.distanceMatrix[from][to];
+        int best = INF;
+        const int n = instance.dimension;
+
+        for (int to = 0; to < n; ++to) {
+            if (to == from) {
+                continue;
+            }
+
+            if (!visited[to] || to == Config::START_VERTEX) {
+                best = std::min(best, instance.distanceMatrix[from][to]);
             }
         }
-        return INF;
+
+        return best;
     }
 
     int minIncomingFromUnvisitedOrCurrent(
             const TSPInstance& instance,
             int to,
-            uint64_t visited_mask, // Zmieniono z std::vector<bool>
+            const std::vector<bool>& visited,
             int currentVertex
     ) {
         int best = INF;
         const int n = instance.dimension;
 
         for (int from = 0; from < n; ++from) {
-            if (from == to) continue;
+            if (from == to) {
+                continue;
+            }
 
-            // Sprawdzenie bitowe zamiast tablicy
-            if (!(visited_mask & (1ULL << from)) || from == currentVertex) {
+            if (!visited[from] || from == currentVertex) {
                 best = std::min(best, instance.distanceMatrix[from][to]);
             }
         }
+
         return best;
+    }
+
+    long long hungarianMinCost(const std::vector<std::vector<int>>& a) {
+        const int n = static_cast<int>(a.size());
+        if (n == 0) {
+            return 0;
+        }
+
+        std::vector<long long> u(n + 1, 0), v(n + 1, 0);
+        std::vector<int> p(n + 1, 0), way(n + 1, 0);
+
+        for (int i = 1; i <= n; ++i) {
+            p[0] = i;
+            int j0 = 0;
+            std::vector<long long> minv(n + 1, static_cast<long long>(INF) * INF);
+            std::vector<bool> used(n + 1, false);
+
+            do {
+                used[j0] = true;
+                const int i0 = p[j0];
+                long long delta = static_cast<long long>(INF) * INF;
+                int j1 = 0;
+
+                for (int j = 1; j <= n; ++j) {
+                    if (used[j]) {
+                        continue;
+                    }
+
+                    const long long cur =
+                            static_cast<long long>(a[i0 - 1][j - 1]) - u[i0] - v[j];
+
+                    if (cur < minv[j]) {
+                        minv[j] = cur;
+                        way[j] = j0;
+                    }
+
+                    if (minv[j] < delta) {
+                        delta = minv[j];
+                        j1 = j;
+                    }
+                }
+
+                for (int j = 0; j <= n; ++j) {
+                    if (used[j]) {
+                        u[p[j]] += delta;
+                        v[j] -= delta;
+                    } else {
+                        minv[j] -= delta;
+                    }
+                }
+
+                j0 = j1;
+            } while (p[j0] != 0);
+
+            do {
+                const int j1 = way[j0];
+                p[j0] = p[j1];
+                j0 = j1;
+            } while (j0 != 0);
+        }
+
+        std::vector<int> assignment(n + 1, 0);
+        for (int j = 1; j <= n; ++j) {
+            assignment[p[j]] = j;
+        }
+
+        long long value = 0;
+        for (int i = 1; i <= n; ++i) {
+            const int j = assignment[i];
+            value += a[i - 1][j - 1];
+        }
+
+        return value;
     }
 
     int computeAssignmentBoundATSP(
@@ -196,21 +280,41 @@ namespace {
         long long outBound = node.partial_cost;
         long long inBound = node.partial_cost;
 
-        // Przekazujemy visited_mask zamiast node.visited
-        const int currentOut = minOutgoingToUnvisitedOrStart(instance, node.current_vertex, node.visited_mask);
-        if (currentOut >= INF) return INF;
+        const int currentOut =
+                minOutgoingToUnvisitedOrStart(instance, node.current_vertex, node.visited);
+        if (currentOut >= INF) {
+            return INF;
+        }
         outBound += currentOut;
 
-        const int startIn = minIncomingFromUnvisitedOrCurrent(instance, Config::START_VERTEX, node.visited_mask, node.current_vertex);
-        if (startIn >= INF) return INF;
+        const int startIn =
+                minIncomingFromUnvisitedOrCurrent(
+                        instance,
+                        Config::START_VERTEX,
+                        node.visited,
+                        node.current_vertex
+                );
+        if (startIn >= INF) {
+            return INF;
+        }
         inBound += startIn;
 
         for (int v = 0; v < n; ++v) {
-            if (!(node.visited_mask & (1ULL << v))) { // Sprawdzenie bitowe
-                const int outMin = minOutgoingToUnvisitedOrStart(instance, v, node.visited_mask);
-                const int inMin = minIncomingFromUnvisitedOrCurrent(instance, v, node.visited_mask, node.current_vertex);
+            if (!node.visited[v]) {
+                const int outMin =
+                        minOutgoingToUnvisitedOrStart(instance, v, node.visited);
 
-                if (outMin >= INF || inMin >= INF) return INF;
+                const int inMin =
+                        minIncomingFromUnvisitedOrCurrent(
+                                instance,
+                                v,
+                                node.visited,
+                                node.current_vertex
+                        );
+
+                if (outMin >= INF || inMin >= INF) {
+                    return INF;
+                }
 
                 outBound += outMin;
                 inBound += inMin;
@@ -218,7 +322,11 @@ namespace {
         }
 
         const long long total = std::max(outBound, inBound);
-        return (total >= INF) ? INF : static_cast<int>(total);
+        if (total >= INF) {
+            return INF;
+        }
+
+        return static_cast<int>(total);
     }
 }
 
@@ -239,6 +347,10 @@ int computeLowerBound(const TSPInstance& instance, const BnBNode& node) {
 
     if (n <= 0) {
         throw std::runtime_error("Niepoprawna instancja w computeLowerBound.");
+    }
+
+    if (static_cast<int>(node.visited.size()) != n) {
+        throw std::runtime_error("Rozmiar visited nie zgadza sie z dimension.");
     }
 
     if (node.current_vertex < 0 || node.current_vertex >= n) {

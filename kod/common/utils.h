@@ -37,5 +37,6 @@ double elapsedMilliseconds(
 );
 
 std::string pathToString(const std::vector<int>& path, const TSPInstance& instance);
+void buildSortedNeighbors(TSPInstance& instance);
 
 #endif //PEA2_UTILS_H
