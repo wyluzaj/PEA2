@@ -14,9 +14,11 @@
 namespace {
     BnBNode createRootNode(const TSPInstance& instance) {
         BnBNode root;
+        root.path.reserve(instance.dimension); // OPTYMALIZACJA: rezerwacja pamieci
         root.path.push_back(Config::START_VERTEX);
-        root.visited.assign(instance.dimension, false);
-        root.visited[Config::START_VERTEX] = true;
+
+        root.visited_mask |= (1ULL << Config::START_VERTEX); // ZMIANA: Zapalamy bit startowy
+
         root.current_vertex = Config::START_VERTEX;
         root.level = 1;
         root.partial_cost = 0;
@@ -30,8 +32,11 @@ namespace {
             int nextVertex
     ) {
         BnBNode child = parent;
+        child.path.reserve(instance.dimension); // OPTYMALIZACJA
         child.path.push_back(nextVertex);
-        child.visited[nextVertex] = true;
+
+        child.visited_mask |= (1ULL << nextVertex); // ZMIANA: Zapalamy bit dla nextVertex
+
         child.partial_cost += instance.distanceMatrix[parent.current_vertex][nextVertex];
         child.current_vertex = nextVertex;
         child.level = parent.level + 1;
@@ -79,7 +84,9 @@ namespace {
         const int n = instance.dimension;
 
         completedPath = node.path;
-        std::vector<bool> visited = node.visited;
+        completedPath.reserve(n); // OPTYMALIZACJA
+
+        uint64_t visited = node.visited_mask; // ZMIANA
         int current = node.current_vertex;
         int cost = node.partial_cost;
 
@@ -88,7 +95,7 @@ namespace {
             int bestDist = std::numeric_limits<int>::max();
 
             for (int v = 0; v < n; ++v) {
-                if (visited[v]) {
+                if (visited & (1ULL << v)) { // ZMIANA: Sprawdzamy zapalony bit
                     continue;
                 }
 
@@ -104,7 +111,7 @@ namespace {
             }
 
             completedPath.push_back(bestNext);
-            visited[bestNext] = true;
+            visited |= (1ULL << bestNext); // ZMIANA: Zapalamy bit
             cost += instance.distanceMatrix[current][bestNext];
             current = bestNext;
         }
@@ -202,19 +209,16 @@ TSPResult solveBranchAndBound(
         }
 
         for (int next = 0; next < instance.dimension; ++next) {
-            if (node.visited[next]) {
+            if (node.visited_mask & (1ULL << next)) { // ZMIANA: Bitowe sprawdzenie odwiedzenia
                 continue;
             }
 
             BnBNode child = createChildNode(instance, node, next);
 
-
-            // ZMIANA: Szukamy dobrego UB tylko na pierwszych 3 poziomach
             if (child.level <= 4) {
                 tryUpdateIncumbentFromNode(instance, child, result);
             }
 
-            // dopiero potem liczymy LB, już z potencjalnie lepszym best_cost
             child.lower_bound = computeLowerBound(instance, child);
 
             if (child.lower_bound < result.best_cost) {

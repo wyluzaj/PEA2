@@ -3,10 +3,11 @@
 #pragma once
 
 #include <vector>
+#include <cstdint> // Wymagane dla uint64_t
 
 struct BnBNode {
     std::vector<int> path;            // odwiedzona czesciowa sciezka
-    std::vector<bool> visited;        // visited[i] = czy miasto bylo odwiedzone
+    uint64_t visited_mask = 0;        // ZMIANA: Maska bitowa zastepuje std::vector<bool>
     int current_vertex = -1;          // ostatni wierzcholek sciezki
     int level = 0;                    // liczba odwiedzonych miast
     int partial_cost = 0;             // koszt czesciowej sciezki
