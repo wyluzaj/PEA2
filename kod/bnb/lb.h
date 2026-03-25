@@ -6,9 +6,6 @@
 #include "../common/tsp_instance.h"
 #include "bnb_node.h"
 
-//int computeLowerBound(const TSPInstance& instance, const BnBNode& node);
-//int computeCompletionCost(const TSPInstance& instance, const BnBNode& node);
-
 int computeLowerBound(const TSPInstance& instance, const BnBNode& node);
 int computeCompletionCost(const TSPInstance& instance, const BnBNode& node);
 #endif //PEA2_LB_H
