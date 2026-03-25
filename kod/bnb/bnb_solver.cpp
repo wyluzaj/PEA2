@@ -70,67 +70,6 @@ namespace {
         result.stop_reason = "Zakonczono naturalnie";
     }
 
-    bool completeGreedyFromNode(
-            const TSPInstance& instance,
-            const BnBNode& node,
-            std::vector<int>& completedPath,
-            int& completedCost
-    ) {
-        const int n = instance.dimension;
-
-        completedPath = node.path;
-        std::vector<bool> visited = node.visited;
-        int current = node.current_vertex;
-        int cost = node.partial_cost;
-
-        while (static_cast<int>(completedPath.size()) < n) {
-            int bestNext = -1;
-            int bestDist = std::numeric_limits<int>::max();
-
-            for (int v = 0; v < n; ++v) {
-                if (visited[v]) {
-                    continue;
-                }
-
-                const int d = instance.distanceMatrix[current][v];
-                if (d < bestDist) {
-                    bestDist = d;
-                    bestNext = v;
-                }
-            }
-
-            if (bestNext == -1) {
-                return false;
-            }
-
-            completedPath.push_back(bestNext);
-            visited[bestNext] = true;
-            cost += instance.distanceMatrix[current][bestNext];
-            current = bestNext;
-        }
-
-        cost += instance.distanceMatrix[current][Config::START_VERTEX];
-        completedCost = cost;
-        return true;
-    }
-
-    void tryUpdateIncumbentFromNode(
-            const TSPInstance& instance,
-            const BnBNode& node,
-            TSPResult& result
-    ) {
-        std::vector<int> candidatePath;
-        int candidateCost = -1;
-
-        if (!completeGreedyFromNode(instance, node, candidatePath, candidateCost)) {
-            return;
-        }
-
-        if (candidateCost < result.best_cost) {
-            result.best_cost = candidateCost;
-            result.best_path = candidatePath;
-        }
-    }
 }
 
 TSPResult solveBranchAndBound(
@@ -208,11 +147,6 @@ TSPResult solveBranchAndBound(
 
             BnBNode child = createChildNode(instance, node, next);
 
-
-            // ZMIANA: Szukamy dobrego UB tylko na pierwszych 3 poziomach
-            if (child.level <= 4) {
-                tryUpdateIncumbentFromNode(instance, child, result);
-            }
 
             // dopiero potem liczymy LB, już z potencjalnie lepszym best_cost
             child.lower_bound = computeLowerBound(instance, child);
