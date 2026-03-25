@@ -70,30 +70,26 @@ namespace {
             return 0;
         }
 
-        std::vector<int> costs;
         const int n = instance.dimension;
-        costs.reserve(n - 1);
+        long long sum = 0;
+        int found = 0;
 
-        for (int u = 0; u < n; ++u) {
+        // BŁYSKAWICZNE SZUKANIE: Iterujemy po gotowej, posortowanej liście sąsiadów (złożoność ok. O(1))
+        for (int u : instance.sortedNeighbors[v]) {
             if (!isResidualEdgeAllowed(node, v, u, remainingDegree, n)) {
                 continue;
             }
 
-            costs.push_back(instance.distanceMatrix[v][u]);
+            sum += instance.distanceMatrix[v][u];
+            found++;
+
+            // Jeśli znaleźliśmy wymagane 'k' najtańszych krawędzi, od razu kończymy szukanie!
+            if (found == k) {
+                break;
+            }
         }
 
-        if (static_cast<int>(costs.size()) < k) {
-            return INF;
-        }
-
-        std::nth_element(costs.begin(), costs.begin() + k, costs.end());
-
-        long long sum = 0;
-        for (int i = 0; i < k; ++i) {
-            sum += costs[i];
-        }
-
-        if (sum >= INF) {
+        if (found < k || sum >= INF) {
             return INF;
         }
 
@@ -159,20 +155,13 @@ namespace {
             int from,
             const std::vector<bool>& visited
     ) {
-        int best = INF;
-        const int n = instance.dimension;
-
-        for (int to = 0; to < n; ++to) {
-            if (to == from) {
-                continue;
-            }
-
+        // Zamiast przeszukiwać cały wiersz, bierzemy pierwszego dozwolonego z posortowanej listy
+        for (int to : instance.sortedNeighbors[from]) {
             if (!visited[to] || to == Config::START_VERTEX) {
-                best = std::min(best, instance.distanceMatrix[from][to]);
+                return instance.distanceMatrix[from][to];
             }
         }
-
-        return best;
+        return INF;
     }
 
     int minIncomingFromUnvisitedOrCurrent(

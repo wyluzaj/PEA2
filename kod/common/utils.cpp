@@ -37,7 +37,20 @@ void buildDistanceMatrix(TSPInstance& instance) {
             }
         }
     }
-
+    instance.sortedNeighbors.assign(n, std::vector<int>());
+    for (int i = 0; i < n; ++i) {
+        // Dodaj wszystkich potencjalnych sąsiadów (oprócz samego siebie)
+        for (int j = 0; j < n; ++j) {
+            if (i != j) {
+                instance.sortedNeighbors[i].push_back(j);
+            }
+        }
+        // Sortuj rosnąco po koszcie krawędzi od wierzchołka 'i'
+        std::sort(instance.sortedNeighbors[i].begin(), instance.sortedNeighbors[i].end(),
+                  [&](int a, int b) {
+                      return instance.distanceMatrix[i][a] < instance.distanceMatrix[i][b];
+                  });
+    }
     instance.symmetric = true;
     if (instance.type.empty()) {
         instance.type = "TSP";

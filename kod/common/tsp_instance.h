@@ -21,6 +21,7 @@ struct TSPInstance {
 
     std::vector<City> cities;          // dla instancji wspolrzednosciowych
     std::vector<std::vector<int>> distanceMatrix;
+    std::vector<std::vector<int>> sortedNeighbors;
 
     bool isValid() const {
         return dimension > 0 &&
