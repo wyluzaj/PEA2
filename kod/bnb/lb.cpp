@@ -4,9 +4,7 @@
 #include <limits>
 #include <stdexcept>
 #include <vector>
-
 #include "../common/config.h"
-
 namespace {
     constexpr int INF = std::numeric_limits<int>::max() / 8;
 
@@ -148,14 +146,15 @@ namespace {
         return static_cast<int>(total);
     }
 
-    // -------------------- ATSP helpers --------------------
+// -------------------- ATSP helpers --------------------
 
     int minOutgoingToUnvisitedOrStart(
             const TSPInstance& instance,
             int from,
-            uint64_t visited_mask
+            uint64_t visited_mask // Zmieniono z std::vector<bool>
     ) {
         for (int to : instance.sortedNeighbors[from]) {
+            // Sprawdzenie bitowe zamiast tablicy
             if (!(visited_mask & (1ULL << to)) || to == Config::START_VERTEX) {
                 return instance.distanceMatrix[from][to];
             }
@@ -166,22 +165,20 @@ namespace {
     int minIncomingFromUnvisitedOrCurrent(
             const TSPInstance& instance,
             int to,
-            uint64_t visited_mask,
+            uint64_t visited_mask, // Zmieniono z std::vector<bool>
             int currentVertex
     ) {
         int best = INF;
         const int n = instance.dimension;
 
         for (int from = 0; from < n; ++from) {
-            if (from == to) {
-                continue;
-            }
+            if (from == to) continue;
 
+            // Sprawdzenie bitowe zamiast tablicy
             if (!(visited_mask & (1ULL << from)) || from == currentVertex) {
                 best = std::min(best, instance.distanceMatrix[from][to]);
             }
         }
-
         return best;
     }
 
@@ -199,41 +196,21 @@ namespace {
         long long outBound = node.partial_cost;
         long long inBound = node.partial_cost;
 
-        const int currentOut =
-                minOutgoingToUnvisitedOrStart(instance, node.current_vertex, node.visited_mask);
-        if (currentOut >= INF) {
-            return INF;
-        }
+        // Przekazujemy visited_mask zamiast node.visited
+        const int currentOut = minOutgoingToUnvisitedOrStart(instance, node.current_vertex, node.visited_mask);
+        if (currentOut >= INF) return INF;
         outBound += currentOut;
 
-        const int startIn =
-                minIncomingFromUnvisitedOrCurrent(
-                        instance,
-                        Config::START_VERTEX,
-                        node.visited_mask,
-                        node.current_vertex
-                );
-        if (startIn >= INF) {
-            return INF;
-        }
+        const int startIn = minIncomingFromUnvisitedOrCurrent(instance, Config::START_VERTEX, node.visited_mask, node.current_vertex);
+        if (startIn >= INF) return INF;
         inBound += startIn;
 
         for (int v = 0; v < n; ++v) {
-            if (!(node.visited_mask & (1ULL << v))) {
-                const int outMin =
-                        minOutgoingToUnvisitedOrStart(instance, v, node.visited_mask);
+            if (!(node.visited_mask & (1ULL << v))) { // Sprawdzenie bitowe
+                const int outMin = minOutgoingToUnvisitedOrStart(instance, v, node.visited_mask);
+                const int inMin = minIncomingFromUnvisitedOrCurrent(instance, v, node.visited_mask, node.current_vertex);
 
-                const int inMin =
-                        minIncomingFromUnvisitedOrCurrent(
-                                instance,
-                                v,
-                                node.visited_mask,
-                                node.current_vertex
-                        );
-
-                if (outMin >= INF || inMin >= INF) {
-                    return INF;
-                }
+                if (outMin >= INF || inMin >= INF) return INF;
 
                 outBound += outMin;
                 inBound += inMin;
@@ -241,11 +218,7 @@ namespace {
         }
 
         const long long total = std::max(outBound, inBound);
-        if (total >= INF) {
-            return INF;
-        }
-
-        return static_cast<int>(total);
+        return (total >= INF) ? INF : static_cast<int>(total);
     }
 }
 
