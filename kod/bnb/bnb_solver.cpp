@@ -3,7 +3,6 @@
 #include <chrono>
 #include <limits>
 #include <stdexcept>
-#include <vector>
 
 #include "../common/utils.h"
 #include "bnb_node.h"
@@ -146,9 +145,6 @@ TSPResult solveBranchAndBound(
             }
 
             BnBNode child = createChildNode(instance, node, next);
-
-
-            // dopiero potem liczymy LB, już z potencjalnie lepszym best_cost
             child.lower_bound = computeLowerBound(instance, child);
 
             if (child.lower_bound < result.best_cost) {

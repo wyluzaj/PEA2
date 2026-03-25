@@ -19,9 +19,6 @@ int calculatePartialPathCost(const TSPInstance& instance, const std::vector<int>
 std::string getFileNameWithoutExtension(const std::string& filePath);
 std::string normalizePath(const std::string& path);
 
-std::vector<int> makeBasePath(int n);
-std::vector<int> generateRandomPermutationKeepingStart(int n, std::mt19937& gen);
-
 std::vector<int> nearestNeighborPath(
         const TSPInstance& instance,
         int startVertex,

@@ -1,17 +1,45 @@
 #include "lb.h"
+
 #include <algorithm>
 #include <limits>
+#include <queue>
 #include <vector>
-#include "../common/config.h"
+
 
 namespace {
-    constexpr int INF = std::numeric_limits<int>::max() / 2;
+    constexpr int INF = std::numeric_limits<int>::max() / 4;
 
-    // Pomocnicza funkcja do szybkiego szukania najtańszej krawędzi wyjściowej
-    // używająca posortowanej listy sąsiadów.
-    int getMinEdgeToUnvisited(const TSPInstance& instance, int from, const std::vector<bool>& visited) {
-        // Zakładamy, że instance.sortedNeighbors[from] zawiera ID sąsiadów
-        // posortowanych według wag w distanceMatrix[from][sąsiad]
+    struct InternalEdgeCandidate {
+        int cost;
+        int from;
+        int to;
+        int nextPosInSorted; // pozycja w sortedNeighbors[from], z której pochodzi kandydat
+
+        bool operator>(const InternalEdgeCandidate& other) const {
+            if (cost != other.cost) return cost > other.cost;
+            if (from != other.from) return from > other.from;
+            return to > other.to;
+        }
+    };
+
+
+    std::vector<int> getUnvisitedVertices(const TSPInstance& instance, const BnBNode& node) {
+        std::vector<int> unvisited;
+        unvisited.reserve(instance.dimension - node.level);
+
+        for (int v = 0; v < instance.dimension; ++v) {
+            if (!node.visited[v]) {
+                unvisited.push_back(v);
+            }
+        }
+        return unvisited;
+    }
+
+    int getMinEdgeFromCurrentToUnvisited(
+            const TSPInstance& instance,
+            int from,
+            const std::vector<bool>& visited
+    ) {
         for (int to : instance.sortedNeighbors[from]) {
             if (!visited[to]) {
                 return instance.distanceMatrix[from][to];
@@ -20,22 +48,133 @@ namespace {
         return INF;
     }
 
-    // Dla 3. metody: najtańszy wjazd do v z innego NIEODWIEDZONEGO u
-    int getMinInternalEdge(const TSPInstance& instance, int v, const std::vector<bool>& visited) {
-        // Jeśli masz listę posortowanych wjazdów (InNeighbors), użyj jej.
-        // Jeśli nie, musimy przeszukać nieodwiedzone węzły.
-        int minIn = INF;
-        const int n = instance.dimension;
-
-        for (int u = 0; u < n; ++u) {
-            if (u != v && !visited[u]) {
-                if (instance.distanceMatrix[u][v] < minIn) {
-                    minIn = instance.distanceMatrix[u][v];
-                }
+    int getMinEdgeFromUnvisitedToStart(
+            const TSPInstance& instance,
+            const std::vector<bool>& visited
+    ) {
+        const int start = Config::START_VERTEX;
+        for (int from : instance.sortedInNeighbors[start]) {
+            if (!visited[from]) {
+                return instance.distanceMatrix[from][start];
             }
         }
-        return minIn;
+        return INF;
     }
+
+    // Zwraca kolejnego poprawnego kandydata krawędzi wewnętrznej wychodzącej z "from",
+    // korzystając z sortedNeighbors[from].
+    //
+    // Dla TSP symetrycznego unikamy duplikatów przez warunek from < to.
+    // Dla ATSP bierzemy wszystkie łuki from -> to, gdzie oba końce są nieodwiedzone.
+    bool getNextInternalCandidate(
+            const TSPInstance& instance,
+            int from,
+            const std::vector<bool>& visited,
+            int startPos,
+            InternalEdgeCandidate& outCandidate
+    ) {
+        const auto& neigh = instance.sortedNeighbors[from];
+        const bool symmetric = instance.symmetric;
+
+        for (int pos = startPos; pos < static_cast<int>(neigh.size()); ++pos) {
+            const int to = neigh[pos];
+
+            if (to == from) {
+                continue;
+            }
+
+            if (visited[to]) {
+                continue;
+            }
+
+            // W TSP symetrycznym chcemy każdą krawędź nieskierowaną policzyć tylko raz.
+            // Przyjmujemy konwencję: bierzemy tylko te z from < to.
+            if (symmetric && from > to) {
+                continue;
+            }
+
+            outCandidate.cost = instance.distanceMatrix[from][to];
+            outCandidate.from = from;
+            outCandidate.nextPosInSorted = pos;
+            return true;
+        }
+
+        return false;
+    }
+
+    // Suma (|U|-1) najmniejszych połączeń wewnątrz zbioru nieodwiedzonych,
+    // wyciąganych z list sortedNeighbors, bez pełnego skanowania macierzy.
+    //
+    // Interpretacja:
+    // - TSP symetryczne: bierzemy (k-1) najmniejszych krawędzi nieskierowanych w U
+    // - ATSP: bierzemy (k-1) najmniejszych łuków skierowanych w U
+    //
+    // To jest przybliżone LB zgodne z ideą slajdu:
+    // "zliczać najmniejsze odległości, które łączą dwa nieodwiedzone węzły".
+    int getInternalResidualBound(
+            const TSPInstance& instance,
+            const std::vector<int>& unvisited,
+            const std::vector<bool>& visited
+    ) {
+        const int k = static_cast<int>(unvisited.size());
+
+        if (k <= 1) {
+            return 0;
+        }
+
+        const int neededEdges = k - 1;
+
+        std::priority_queue<
+                InternalEdgeCandidate,
+                std::vector<InternalEdgeCandidate>,
+                std::greater<>
+        > pq;
+
+        // Startowo wrzucamy po jednym najtańszym poprawnym kandydacie z każdego nieodwiedzonego źródła.
+        for (int from : unvisited) {
+            InternalEdgeCandidate cand{};
+            if (getNextInternalCandidate(instance, from, visited, 0, cand)) {
+                pq.push(cand);
+            }
+        }
+
+        long long sum = 0;
+        int taken = 0;
+
+        while (!pq.empty() && taken < neededEdges) {
+            InternalEdgeCandidate best = pq.top();
+            pq.pop();
+
+            sum += best.cost;
+            if (sum >= INF) {
+                return INF;
+            }
+            ++taken;
+
+            // Szukamy kolejnego poprawnego kandydata z tego samego "from"
+            InternalEdgeCandidate nextCand{};
+            if (getNextInternalCandidate(
+                    instance,
+                    best.from,
+                    visited,
+                    best.nextPosInSorted + 1,
+                    nextCand
+            )) {
+                pq.push(nextCand);
+            }
+        }
+
+        // Jeżeli nie udało się zebrać k-1 połączeń, traktujemy to jako brak sensownego LB.
+        if (taken < neededEdges) {
+            return INF;
+        }
+
+        return static_cast<int>(sum);
+    }
+}
+int computeCompletionCost(const TSPInstance& instance, const BnBNode& node) {
+    return node.partial_cost +
+           instance.distanceMatrix[node.current_vertex][Config::START_VERTEX];
 }
 
 int computeLowerBound(const TSPInstance& instance, const BnBNode& node) {
@@ -43,46 +182,42 @@ int computeLowerBound(const TSPInstance& instance, const BnBNode& node) {
     const int startNode = Config::START_VERTEX;
     const int currentNode = node.current_vertex;
 
-    // 1. Jeśli ścieżka jest pełna - koszt rzeczywisty (domknięcie cyklu)
+    // Pełna ścieżka - trzeba tylko domknąć cykl
     if (node.level == n) {
+        return node.partial_cost + instance.distanceMatrix[currentNode][startNode];
+    }
+
+    const std::vector<int> unvisited = getUnvisitedVertices(instance, node);
+
+    if (unvisited.empty()) {
         return node.partial_cost + instance.distanceMatrix[currentNode][startNode];
     }
 
     long long lb = node.partial_cost;
 
-    // 2. Koszt wyjścia z aktualnego wierzchołka do "chmury" nieodwiedzonych
-    int outFromCurrent = getMinEdgeToUnvisited(instance, currentNode, node.visited);
-    if (outFromCurrent >= INF) return INF;
+    // 1. Wyjście z current do zbioru nieodwiedzonych
+    const int outFromCurrent =
+            getMinEdgeFromCurrentToUnvisited(instance, currentNode, node.visited);
+    if (outFromCurrent >= INF) {
+        return INF;
+    }
     lb += outFromCurrent;
 
-    // 3. Koszt powrotu do startu (S) z "chmury" nieodwiedzonych
-    // Szukamy najtańszej krawędzi u -> startNode, gdzie u jest nieodwiedzone
-    int inToStart = INF;
-    for (int u = 0; u < n; ++u) {
-        if (!node.visited[u]) {
-            if (instance.distanceMatrix[u][startNode] < inToStart) {
-                inToStart = instance.distanceMatrix[u][startNode];
-            }
-        }
+    // 2. Powrót ze zbioru nieodwiedzonych do startu
+    const int inToStart =
+            getMinEdgeFromUnvisitedToStart(instance, node.visited);
+    if (inToStart >= INF) {
+        return INF;
     }
-    if (inToStart >= INF) return INF;
     lb += inToStart;
 
-    // 4. KOSZT WEWNĘTRZNY (serce 3. metody)
-    // Dla każdego nieodwiedzonego węzła szukamy najtańszego wjazdu
-    // z INNEGO nieodwiedzonego węzła.
-    for (int v = 0; v < n; ++v) {
-        if (!node.visited[v]) {
-            int internalIn = getMinInternalEdge(instance, v, node.visited);
-
-            // Jeśli został tylko 1 nieodwiedzony węzeł, getMinInternalEdge zwróci INF.
-            // Jest to poprawne, bo ten węzeł jest już połączony
-            // krawędziami z pkt 2 i 3 (current -> v -> start).
-            if (internalIn < INF) {
-                lb += internalIn;
-            }
-        }
+    // 3. Połączenia wyłącznie pomiędzy nieodwiedzonymi
+    const int internalBound =
+            getInternalResidualBound(instance, unvisited, node.visited);
+    if (internalBound >= INF) {
+        return INF;
     }
+    lb += internalBound;
 
-    return (lb > INF) ? INF : static_cast<int>(lb);
+    return (lb >= INF) ? INF : static_cast<int>(lb);
 }

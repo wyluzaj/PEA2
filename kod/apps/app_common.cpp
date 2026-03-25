@@ -5,7 +5,6 @@
 #include <string>
 
 #include "../bnb/bnb_solver.h"
-#include "../common/config.h"
 #include "../common/instance_loader.h"
 #include "../common/utils.h"
 #include "../common/writer.h"

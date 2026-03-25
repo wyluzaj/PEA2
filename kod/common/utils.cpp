@@ -4,30 +4,40 @@
 #include <cmath>
 #include <filesystem>
 #include <limits>
-#include <numeric>
 #include <sstream>
 #include <stdexcept>
+#include <cctype>
 
 int calculateDistance(const City& a, const City& b) {
     const double dx = a.x - b.x;
     const double dy = a.y - b.y;
     return static_cast<int>(std::round(std::sqrt(dx * dx + dy * dy)));
 }
+
 void buildSortedNeighbors(TSPInstance& instance) {
     const int n = instance.dimension;
-    instance.sortedNeighbors.assign(n, std::vector<int>());
+    instance.sortedNeighbors.assign(n, {});
+    instance.sortedInNeighbors.assign(n, {});
     for (int i = 0; i < n; ++i) {
         for (int j = 0; j < n; ++j) {
             if (i != j) {
                 instance.sortedNeighbors[i].push_back(j);
+                instance.sortedInNeighbors[i].push_back(j);
             }
         }
+
         std::sort(instance.sortedNeighbors[i].begin(), instance.sortedNeighbors[i].end(),
                   [&](int a, int b) {
                       return instance.distanceMatrix[i][a] < instance.distanceMatrix[i][b];
                   });
+
+        std::sort(instance.sortedInNeighbors[i].begin(), instance.sortedInNeighbors[i].end(),
+                  [&](int a, int b) {
+                      return instance.distanceMatrix[a][i] < instance.distanceMatrix[b][i];
+                  });
     }
 }
+
 void buildDistanceMatrix(TSPInstance& instance) {
     const int n = instance.dimension;
 
@@ -54,6 +64,7 @@ void buildDistanceMatrix(TSPInstance& instance) {
 
     buildSortedNeighbors(instance);
     instance.symmetric = true;
+
     if (instance.type.empty()) {
         instance.type = "TSP";
     }
@@ -127,19 +138,6 @@ std::string normalizePath(const std::string& path) {
     return result;
 }
 
-std::vector<int> makeBasePath(int n) {
-    std::vector<int> path(n);
-    std::iota(path.begin(), path.end(), 0);
-    return path;
-}
-
-std::vector<int> generateRandomPermutationKeepingStart(int n, std::mt19937& gen) {
-    std::vector<int> path = makeBasePath(n);
-    if (n > 1) {
-        std::shuffle(path.begin() + 1, path.end(), gen);
-    }
-    return path;
-}
 
 std::vector<int> nearestNeighborPath(
         const TSPInstance& instance,

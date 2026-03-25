@@ -5,7 +5,6 @@
 #include <vector>
 
 #include "../common/utils.h"
-#include "../common/config.h"
 
 UpperBoundResult computeInitialUpperBoundNN(const TSPInstance& instance) {
     if (!instance.isValid()) {
