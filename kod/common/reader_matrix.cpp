@@ -82,9 +82,10 @@ TSPInstance readMatrixInstance(const std::string& filePath) {
         else if (startsWith(line, "EDGE_WEIGHT_FORMAT")) {
             edgeWeightFormat = getValueAfterColon(line);
 
-            if (edgeWeightFormat != "FULL_MATRIX") {
+            // ZMIANA 1: Rozszerzamy walidację o LOWER_DIAG_ROW
+            if (edgeWeightFormat != "FULL_MATRIX" && edgeWeightFormat != "LOWER_DIAG_ROW") {
                 throw std::runtime_error(
-                        "Obslugiwany jest tylko EDGE_WEIGHT_FORMAT = FULL_MATRIX. Plik: " + filePath
+                        "Obslugiwany format to FULL_MATRIX lub LOWER_DIAG_ROW. Plik: " + filePath
                 );
             }
         }
@@ -121,13 +122,25 @@ TSPInstance readMatrixInstance(const std::string& filePath) {
             instance.dimension,
             std::vector<int>(instance.dimension, 0)
     );
-
-    for (int i = 0; i < instance.dimension; ++i) {
-        for (int j = 0; j < instance.dimension; ++j) {
-            if (!(file >> instance.distanceMatrix[i][j])) {
-                throw std::runtime_error(
-                        "Za malo danych w EDGE_WEIGHT_SECTION w pliku: " + filePath
-                );
+    if (edgeWeightFormat == "FULL_MATRIX") {
+        for (int i = 0; i < instance.dimension; ++i) {
+            for (int j = 0; j < instance.dimension; ++j) {
+                if (!(file >> instance.distanceMatrix[i][j])) {
+                    throw std::runtime_error("Za malo danych w FULL_MATRIX.");
+                }
+            }
+        }
+    }
+    else if (edgeWeightFormat == "LOWER_DIAG_ROW") {
+        for (int i = 0; i < instance.dimension; ++i) {
+            // W tym formacie wiersz 'i' zawiera 'i + 1' wag (od 0 do przekątnej)
+            for (int j = 0; j <= i; ++j) {
+                int weight;
+                if (!(file >> weight)) {
+                    throw std::runtime_error("Za malo danych w LOWER_DIAG_ROW.");
+                }
+                instance.distanceMatrix[i][j] = weight;
+                instance.distanceMatrix[j][i] = weight; // Symetria
             }
         }
     }

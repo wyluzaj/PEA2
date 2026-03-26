@@ -68,11 +68,11 @@ void writeBnBSummaryToFile(TSPResult& result) {
     file << "Typ instancji: " << result.instance_type << "\n";
     file << "n: " << result.vertex_count << "\n";
     file << "Czas [ms]: " << result.total_time_ms << "\n";
-    file << "Sciezka optymalna: " << result.best_cost << "\n";
+    file << "Najlepszy znaleziony koszt: " << result.best_cost << "\n";
     file << "UB wyznaczony przez alg NN: " << result.ub_from_nn << "\n";
 
     if (!result.best_path_text.empty()) {
-        file << "Pelna optymalna sciezka: " << result.best_path_text << "\n";
+        file << "Pelna najlepsza znaleziona sciezka: " << result.best_path_text << "\n";
     }
 
     file << "Liczba odwiedzonych wezlow: " << result.visited_nodes << "\n";
@@ -91,7 +91,7 @@ void appendBnBResultToCsv(const TSPResult& result, const std::string& csvPath) {
     }
 
     if (!fileExists) {
-        file << "algorytm,instancja,typ_instancji,n,czas[ms],UB_wyznaczony,opt,odweidzone,cut\n";
+        file << "alg,inst,typ,n,czas[ms],UB,opt,visited,cut,stop\n";
     }
 
     file << std::fixed << std::setprecision(3);
@@ -103,7 +103,8 @@ void appendBnBResultToCsv(const TSPResult& result, const std::string& csvPath) {
          << result.ub_from_nn << ','
          << result.best_cost << ','
          << result.visited_nodes << ','
-         << result.pruned_nodes
+         << result.pruned_nodes << ','
+         << result.stop_reason
          << '\n';
 }
 
@@ -114,7 +115,7 @@ void printBnBResultToConsole(const TSPResult& result) {
     std::cout << "Typ instancji: " << result.instance_type << "\n";
     std::cout << "n: " << result.vertex_count << "\n";
     std::cout << "Czas [ms]: " << result.total_time_ms << "\n";
-    std::cout << "Sciezka optymalna: " << result.best_cost << "\n";
+    std::cout << "Najlepszy znaleziony koszt: " << result.best_cost << "\n";
     std::cout << "UB wyznaczony przez alg NN: " << result.ub_from_nn << "\n";
 
     if (!result.summary_file_name.empty()) {
