@@ -9,23 +9,23 @@
 
 class BFSFrontier : public ISearchFrontier {
 private:
-    std::queue<BnBNode> data;
+    std::queue<NodeId> data;
 
 public:
     BFSFrontier() = default;
 
-    void push(const BnBNode& node) override {
-        data.push(node);
+    void push(NodeId nodeId, int /*lowerBound*/) override {
+        data.push(nodeId);
     }
 
-    BnBNode pop() override {
+    NodeId pop() override {
         if (data.empty()) {
             throw std::runtime_error("BFSFrontier: proba pobrania z pustej struktury.");
         }
 
-        BnBNode node = data.front();
+        NodeId nodeId = data.front();
         data.pop();
-        return node;
+        return nodeId;
     }
 
     bool empty() const override {

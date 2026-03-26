@@ -4,30 +4,46 @@
 
 #include <queue>
 #include <stdexcept>
+#include <utility>
 #include <vector>
 
-#include "../bnb/bnb_node.h"
 #include "search_strategy.h"
+
+struct BestFSItem {
+    int lower_bound;
+    NodeId node_id;
+
+    bool operator>(const BestFSItem& other) const {
+        if (lower_bound != other.lower_bound) {
+            return lower_bound > other.lower_bound;
+        }
+        return node_id > other.node_id;
+    }
+};
 
 class BestFSFrontier : public ISearchFrontier {
 private:
-    std::priority_queue<BnBNode, std::vector<BnBNode>, CompareByLowerBound> data;
+    std::priority_queue<
+            BestFSItem,
+            std::vector<BestFSItem>,
+            std::greater<>
+    > data;
 
 public:
     BestFSFrontier() = default;
 
-    void push(const BnBNode& node) override {
-        data.push(node);
+    void push(NodeId nodeId, int lowerBound) override {
+        data.push(BestFSItem{lowerBound, nodeId});
     }
 
-    BnBNode pop() override {
+    NodeId pop() override {
         if (data.empty()) {
             throw std::runtime_error("BestFSFrontier: proba pobrania z pustej struktury.");
         }
 
-        BnBNode node = data.top();
+        NodeId nodeId = data.top().node_id;
         data.pop();
-        return node;
+        return nodeId;
     }
 
     bool empty() const override {
