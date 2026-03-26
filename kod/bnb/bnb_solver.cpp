@@ -1,21 +1,34 @@
 #include "bnb_solver.h"
 
+#include <algorithm>
 #include <chrono>
 #include <limits>
 #include <stdexcept>
+#include <vector>
 
 #include "../common/utils.h"
 #include "bnb_node.h"
 #include "lb.h"
 #include "ub.h"
 
-
 namespace {
+    std::vector<int> materializePath(const std::vector<BnBNode>& nodePool, int nodeId) {
+        std::vector<int> reversedPath;
+
+        while (nodeId != -1) {
+            reversedPath.push_back(nodePool[nodeId].current_vertex);
+            nodeId = nodePool[nodeId].parent_index;
+        }
+
+        std::reverse(reversedPath.begin(), reversedPath.end());
+        return reversedPath;
+    }
+
     BnBNode createRootNode(const TSPInstance& instance) {
         BnBNode root;
-        root.path.push_back(Config::START_VERTEX);
         root.visited.assign(instance.dimension, false);
         root.visited[Config::START_VERTEX] = true;
+        root.parent_index = -1;
         root.current_vertex = Config::START_VERTEX;
         root.level = 1;
         root.partial_cost = 0;
@@ -26,10 +39,11 @@ namespace {
     BnBNode createChildNode(
             const TSPInstance& instance,
             const BnBNode& parent,
+            int parentIndex,
             int nextVertex
     ) {
         BnBNode child = parent;
-        child.path.push_back(nextVertex);
+        child.parent_index = parentIndex;
         child.visited[nextVertex] = true;
         child.partial_cost += instance.distanceMatrix[parent.current_vertex][nextVertex];
         child.current_vertex = nextVertex;
@@ -68,7 +82,6 @@ namespace {
         result.completed_naturally = true;
         result.stop_reason = "Zakonczono naturalnie";
     }
-
 }
 
 TSPResult solveBranchAndBound(
@@ -90,9 +103,8 @@ TSPResult solveBranchAndBound(
     TSPResult result;
     initializeResultBase(result, instance, algorithmName);
 
-    // 1. Najpierw NN - poza pomiarem czasu BnB
-    UpperBoundResult ubResult = computeInitialUpperBoundNN(instance);
-
+//    UpperBoundResult ubResult = computeInitialUpperBoundNN(instance);
+    UpperBoundResult ubResult = computeInitialUpperBoundRNN(instance);
     result.ub_from_nn = ubResult.cost;
 
     if (ubResult.path.size() == static_cast<size_t>(instance.dimension)) {
@@ -103,15 +115,16 @@ TSPResult solveBranchAndBound(
         result.best_path.clear();
     }
 
-    // 2. Dopiero teraz startuje czas BnB
     const auto bnbStart = clock::now();
 
-    BnBNode root = createRootNode(instance);
+    std::vector<BnBNode> nodePool;
+    nodePool.reserve(100000);
 
-    // opcjonalnie: także root można spróbować szybko domknąć,
-    // ale tu zwykle to samo dał już computeInitialUpperBoundNN(instance)
+    BnBNode root = createRootNode(instance);
     root.lower_bound = computeLowerBound(instance, root);
-    frontier.push(root);
+
+    nodePool.push_back(std::move(root));
+    frontier.push(0, nodePool[0].lower_bound);
 
     while (!frontier.empty()) {
         if (timeLimitReached(bnbStart, maxTimeSeconds)) {
@@ -120,7 +133,8 @@ TSPResult solveBranchAndBound(
             break;
         }
 
-        BnBNode node = frontier.pop();
+        const NodeId nodeId = frontier.pop();
+        BnBNode node = nodePool[nodeId];
         result.visited_nodes++;
 
         if (node.lower_bound >= result.best_cost) {
@@ -133,7 +147,7 @@ TSPResult solveBranchAndBound(
 
             if (fullCost < result.best_cost) {
                 result.best_cost = fullCost;
-                result.best_path = node.path;
+                result.best_path = materializePath(nodePool, nodeId);
             }
 
             continue;
@@ -144,11 +158,13 @@ TSPResult solveBranchAndBound(
                 continue;
             }
 
-            BnBNode child = createChildNode(instance, node, next);
+            BnBNode child = createChildNode(instance, node, nodeId, next);
             child.lower_bound = computeLowerBound(instance, child);
 
             if (child.lower_bound < result.best_cost) {
-                frontier.push(child);
+                nodePool.push_back(std::move(child));
+                const auto childId = static_cast<NodeId>(nodePool.size() - 1);
+                frontier.push(childId, nodePool[childId].lower_bound);
             } else {
                 result.pruned_nodes++;
             }
