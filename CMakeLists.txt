@@ -37,6 +37,8 @@ add_library(pea2_core
 
         kod/apps/app_common.cpp
         kod/apps/app_common.h
+        kod/apps/app_plain_common.cpp
+        kod/apps/app_plain_common.h
 )
 
 add_executable(PEA2_DFS
@@ -51,11 +53,38 @@ add_executable(PEA2_BESTFS
         kod/apps/main_bestfs.cpp
 )
 
-add_executable(PEA2_BNB_PLAIN
-        kod/apps/main_bnb_plain.cpp
+add_executable(PEA2_PLAIN_DFS_UB_INF
+        kod/apps/main_plain_dfs_ub_inf.cpp
+)
+
+add_executable(PEA2_PLAIN_BFS_UB_INF
+        kod/apps/main_plain_bfs_ub_inf.cpp
+)
+
+add_executable(PEA2_PLAIN_BESTFS_UB_INF
+        kod/apps/main_plain_bestfs_ub_inf.cpp
+)
+
+add_executable(PEA2_PLAIN_DFS_UB_RNN
+        kod/apps/main_plain_dfs_ub_rnn.cpp
+)
+
+add_executable(PEA2_PLAIN_BFS_UB_RNN
+        kod/apps/main_plain_bfs_ub_rnn.cpp
+)
+
+add_executable(PEA2_PLAIN_BESTFS_UB_RNN
+        kod/apps/main_plain_bestfs_ub_rnn.cpp
 )
 
 target_link_libraries(PEA2_DFS pea2_core)
 target_link_libraries(PEA2_BFS pea2_core)
 target_link_libraries(PEA2_BESTFS pea2_core)
-target_link_libraries(PEA2_BNB_PLAIN pea2_core)
+
+target_link_libraries(PEA2_PLAIN_DFS_UB_INF pea2_core)
+target_link_libraries(PEA2_PLAIN_BFS_UB_INF pea2_core)
+target_link_libraries(PEA2_PLAIN_BESTFS_UB_INF pea2_core)
+
+target_link_libraries(PEA2_PLAIN_DFS_UB_RNN pea2_core)
+target_link_libraries(PEA2_PLAIN_BFS_UB_RNN pea2_core)
+target_link_libraries(PEA2_PLAIN_BESTFS_UB_RNN pea2_core)
