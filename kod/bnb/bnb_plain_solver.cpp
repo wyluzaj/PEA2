@@ -6,12 +6,13 @@
 #include <stdexcept>
 #include <vector>
 
-#include "../common/utils.h"
 #include "bnb_node.h"
-#include "lb.h"   // tylko po to, zeby domknac cykl computeCompletionCost(...)
 #include "ub.h"
+#include "../common/utils.h"
 
 namespace {
+    constexpr int INF = std::numeric_limits<int>::max() / 4;
+
     std::vector<int> materializePath(const std::vector<BnBNode>& nodePool, int nodeId) {
         std::vector<int> reversedPath;
 
@@ -32,7 +33,7 @@ namespace {
         root.current_vertex = Config::START_VERTEX;
         root.level = 1;
         root.partial_cost = 0;
-        root.lower_bound = 0; // tutaj nie uzywamy LB local
+        root.lower_bound = 0;
         return root;
     }
 
@@ -48,7 +49,7 @@ namespace {
         child.partial_cost += instance.distanceMatrix[parent.current_vertex][nextVertex];
         child.current_vertex = nextVertex;
         child.level = parent.level + 1;
-        child.lower_bound = child.partial_cost; // tylko jako priorytet dla BestFS
+        child.lower_bound = child.partial_cost;
         return child;
     }
 
@@ -63,6 +64,10 @@ namespace {
         return elapsedSeconds >= maxTimeSeconds;
     }
 
+    int computeCompletionCost(const TSPInstance& instance, const BnBNode& node) {
+        return node.partial_cost + instance.distanceMatrix[node.current_vertex][Config::START_VERTEX];
+    }
+
     void initializeResultBase(
             TSPResult& result,
             const TSPInstance& instance,
@@ -74,7 +79,7 @@ namespace {
                                ? (instance.symmetric ? "TSP" : "ATSP")
                                : instance.type;
         result.vertex_count = instance.dimension;
-        result.best_cost = std::numeric_limits<int>::max();
+        result.best_cost = INF;
         result.best_path.clear();
         result.best_path_text.clear();
         result.ub_from_nn = -1;
@@ -82,22 +87,6 @@ namespace {
         result.pruned_nodes = 0;
         result.completed_naturally = true;
         result.stop_reason = "Zakonczono naturalnie";
-    }
-
-    UpperBoundResult initializeUpperBound(
-            const TSPInstance& instance,
-            InitialUBMode ubMode
-    ) {
-        if (ubMode == InitialUBMode::INF) {
-            UpperBoundResult result;
-            result.cost = std::numeric_limits<int>::max();
-            result.path.clear();
-            result.finished = true;
-            result.timeoutReached = false;
-            return result;
-        }
-
-        return computeInitialUpperBoundRNN(instance);
     }
 }
 
@@ -121,18 +110,17 @@ TSPResult solveBranchAndBoundPlain(
     TSPResult result;
     initializeResultBase(result, instance, algorithmName);
 
-    UpperBoundResult ubResult = initializeUpperBound(instance, ubMode);
-
     if (ubMode == InitialUBMode::RNN) {
+        UpperBoundResult ubResult = computeInitialUpperBoundRNN(instance);
         result.ub_from_nn = ubResult.cost;
-    } else {
-        result.ub_from_nn = -1; // INF
-    }
 
-    result.best_cost = ubResult.cost;
-
-    if (ubResult.path.size() == static_cast<size_t>(instance.dimension)) {
-        result.best_path = ubResult.path;
+        if (ubResult.path.size() == static_cast<size_t>(instance.dimension)) {
+            result.best_cost = ubResult.cost;
+            result.best_path = ubResult.path;
+        } else {
+            result.best_cost = ubResult.cost;
+            result.best_path.clear();
+        }
     }
 
     const auto bnbStart = clock::now();
@@ -141,9 +129,8 @@ TSPResult solveBranchAndBoundPlain(
     nodePool.reserve(100000);
 
     BnBNode root = createRootNode(instance);
-
     nodePool.push_back(std::move(root));
-    frontier.push(0, 0);
+    frontier.push(0, nodePool[0].partial_cost);
 
     while (!frontier.empty()) {
         if (timeLimitReached(bnbStart, maxTimeSeconds)) {
@@ -156,7 +143,6 @@ TSPResult solveBranchAndBoundPlain(
         const BnBNode node = nodePool[nodeId];
         result.visited_nodes++;
 
-        // W tym wariancie odcinamy po koszcie aktualnej sciezki, bez LB local
         if (node.partial_cost >= result.best_cost) {
             result.pruned_nodes++;
             continue;
@@ -183,9 +169,6 @@ TSPResult solveBranchAndBoundPlain(
             if (child.partial_cost < result.best_cost) {
                 nodePool.push_back(std::move(child));
                 const auto childId = static_cast<NodeId>(nodePool.size() - 1);
-
-                // dla DFS/BFS ten parametr jest ignorowany,
-                // dla BestFS robi za priority = aktualny koszt sciezki
                 frontier.push(childId, nodePool[childId].partial_cost);
             } else {
                 result.pruned_nodes++;
