@@ -22,10 +22,13 @@ add_library(pea2_core
 
         kod/bnb/bnb_node.h
         kod/bnb/lb.h
+        kod/bnb/lb.cpp
         kod/bnb/ub.cpp
         kod/bnb/ub.h
         kod/bnb/bnb_solver.cpp
         kod/bnb/bnb_solver.h
+        kod/bnb/bnb_plain_solver.cpp
+        kod/bnb/bnb_plain_solver.h
 
         kod/strategies/search_strategy.h
         kod/strategies/dfs_frontier.h
@@ -34,7 +37,6 @@ add_library(pea2_core
 
         kod/apps/app_common.cpp
         kod/apps/app_common.h
-        kod/bnb/lb.cpp
 )
 
 add_executable(PEA2_DFS
@@ -49,6 +51,11 @@ add_executable(PEA2_BESTFS
         kod/apps/main_bestfs.cpp
 )
 
+add_executable(PEA2_BNB_PLAIN
+        kod/apps/main_bnb_plain.cpp
+)
+
 target_link_libraries(PEA2_DFS pea2_core)
 target_link_libraries(PEA2_BFS pea2_core)
 target_link_libraries(PEA2_BESTFS pea2_core)
+target_link_libraries(PEA2_BNB_PLAIN pea2_core)

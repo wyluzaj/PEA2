@@ -69,7 +69,7 @@ void writeBnBSummaryToFile(TSPResult& result) {
     file << "n: " << result.vertex_count << "\n";
     file << "Czas [ms]: " << result.total_time_ms << "\n";
     file << "Najlepszy znaleziony koszt: " << result.best_cost << "\n";
-    file << "UB wyznaczony przez alg NN: " << result.ub_from_nn << "\n";
+    file << "Poczatkowe UB: " << result.ub_from_nn << "\n";
 
     if (!result.best_path_text.empty()) {
         file << "Pelna najlepsza znaleziona sciezka: " << result.best_path_text << "\n";
@@ -116,7 +116,7 @@ void printBnBResultToConsole(const TSPResult& result) {
     std::cout << "n: " << result.vertex_count << "\n";
     std::cout << "Czas [ms]: " << result.total_time_ms << "\n";
     std::cout << "Najlepszy znaleziony koszt: " << result.best_cost << "\n";
-    std::cout << "UB wyznaczony przez alg NN: " << result.ub_from_nn << "\n";
+    std::cout << "Poczatkowe UB: " << result.ub_from_nn << "\n";
 
     if (!result.summary_file_name.empty()) {
         std::cout << "Plik podgladowy: " << result.summary_file_name << "\n";
