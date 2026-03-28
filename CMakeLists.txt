@@ -6,6 +6,9 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -static -static-libgcc -static-libstdc++")
 
+# ============================================================
+# Biblioteka rdzeniowa (bez zmian w stosunku do oryginału)
+# ============================================================
 add_library(pea2_core
         kod/common/reader.cpp
         kod/common/reader.h
@@ -19,6 +22,10 @@ add_library(pea2_core
         kod/common/writer.h
         kod/common/config.h
         kod/common/tsp_instance.h
+
+        # Nowy parser pliku konfiguracyjnego
+        kod/common/config_parser.cpp
+        kod/common/config_parser.h
 
         kod/bnb/bnb_node.h
         kod/bnb/lb.h
@@ -34,57 +41,13 @@ add_library(pea2_core
         kod/strategies/dfs_frontier.h
         kod/strategies/bfs_frontier.h
         kod/strategies/bestfs_frontier.h
-
-        kod/apps/app_common.cpp
-        kod/apps/app_common.h
-        kod/apps/app_plain_common.cpp
-        kod/apps/app_plain_common.h
 )
 
-add_executable(PEA2_DFS
-        kod/apps/main_dfs.cpp
+# ============================================================
+# Jeden executable sterowany plikiem konfiguracyjnym
+# ============================================================
+add_executable(PEA2
+        kod/apps/main.cpp
 )
 
-add_executable(PEA2_BFS
-        kod/apps/main_bfs.cpp
-)
-
-add_executable(PEA2_BESTFS
-        kod/apps/main_bestfs.cpp
-)
-
-add_executable(PEA2_PLAIN_DFS_UB_INF
-        kod/apps/main_plain_dfs_ub_inf.cpp
-)
-
-add_executable(PEA2_PLAIN_BFS_UB_INF
-        kod/apps/main_plain_bfs_ub_inf.cpp
-)
-
-add_executable(PEA2_PLAIN_BESTFS_UB_INF
-        kod/apps/main_plain_bestfs_ub_inf.cpp
-)
-
-add_executable(PEA2_PLAIN_DFS_UB_RNN
-        kod/apps/main_plain_dfs_ub_rnn.cpp
-)
-
-add_executable(PEA2_PLAIN_BFS_UB_RNN
-        kod/apps/main_plain_bfs_ub_rnn.cpp
-)
-
-add_executable(PEA2_PLAIN_BESTFS_UB_RNN
-        kod/apps/main_plain_bestfs_ub_rnn.cpp
-)
-
-target_link_libraries(PEA2_DFS pea2_core)
-target_link_libraries(PEA2_BFS pea2_core)
-target_link_libraries(PEA2_BESTFS pea2_core)
-
-target_link_libraries(PEA2_PLAIN_DFS_UB_INF pea2_core)
-target_link_libraries(PEA2_PLAIN_BFS_UB_INF pea2_core)
-target_link_libraries(PEA2_PLAIN_BESTFS_UB_INF pea2_core)
-
-target_link_libraries(PEA2_PLAIN_DFS_UB_RNN pea2_core)
-target_link_libraries(PEA2_PLAIN_BFS_UB_RNN pea2_core)
-target_link_libraries(PEA2_PLAIN_BESTFS_UB_RNN pea2_core)
+target_link_libraries(PEA2 pea2_core)
