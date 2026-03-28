@@ -37,14 +37,19 @@ struct TSPResult {
     int vertex_count = 0;              // n
 
     double total_time_ms = 0.0;        // czas wykonania
-    int best_cost = -1;                // koszt optymalny
+    int best_cost = -1;                // koszt najlepszego znalezionego rozwiazania
     std::vector<int> best_path;        // pelna sciezka jako indeksy 0..n-1
     std::string best_path_text;        // tekstowa reprezentacja pelnej sciezki
-    int ub_from_nn = -1;               // poczatkowe UB z NN
+    int ub_from_nn = -1;               // poczatkowe UB z NN / RNN
 
-    long long visited_nodes = 0;       // pomocniczo do badan
-    long long pruned_nodes = 0;        // pomocniczo do badan
+    long long visited_nodes = 0;       // ile stanow zdjeto z frontier i sprawdzono
+    long long pruned_nodes = 0;        // ile stanow odcieto
+    long long generated_nodes = 0;     // ile dzieci rozważono do utworzenia
+    long long stored_nodes = 0;        // ile stanow faktycznie trafiło do pamieci
+    long long max_frontier_size = 0;   // maksymalny rozmiar frontier
+    long long max_node_pool_size = 0;  // maksymalny rozmiar puli nodePool
 
+    bool memory_exhausted = false;
     bool completed_naturally = true;
     std::string stop_reason = "Zakonczono naturalnie";
     std::string summary_file_name;
