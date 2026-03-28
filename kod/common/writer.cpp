@@ -77,10 +77,6 @@ void writeBnBSummaryToFile(TSPResult& result) {
 
     file << "Liczba odwiedzonych wezlow: " << result.visited_nodes << "\n";
     file << "Liczba odcietych wezlow: " << result.pruned_nodes << "\n";
-    file << "Liczba wygenerowanych dzieci: " << result.generated_nodes << "\n";
-    file << "Liczba stanow zapisanych w pamieci: " << result.stored_nodes << "\n";
-    file << "Maksymalny rozmiar frontier: " << result.max_frontier_size << "\n";
-    file << "Maksymalny rozmiar nodePool: " << result.max_node_pool_size << "\n";
     file << "Brak pamieci: " << (result.memory_exhausted ? "TAK" : "NIE") << "\n";
     file << "Powod zakonczenia: " << result.stop_reason << "\n";
 }
@@ -130,9 +126,6 @@ void printBnBResultToConsole(const TSPResult& result) {
     std::cout << "Liczba odwiedzonych wezlow: " << result.visited_nodes << "\n";
     std::cout << "Liczba odcietych wezlow: " << result.pruned_nodes << "\n";
     std::cout << "Liczba wygenerowanych dzieci: " << result.generated_nodes << "\n";
-    std::cout << "Liczba stanow zapisanych w pamieci: " << result.stored_nodes << "\n";
-    std::cout << "Maksymalny rozmiar frontier: " << result.max_frontier_size << "\n";
-    std::cout << "Maksymalny rozmiar nodePool: " << result.max_node_pool_size << "\n";
     std::cout << "Brak pamieci: " << (result.memory_exhausted ? "TAK" : "NIE") << "\n";
     std::cout << "Powod zakonczenia: " << result.stop_reason << "\n";
 

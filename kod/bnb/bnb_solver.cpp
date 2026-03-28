@@ -1,186 +1,89 @@
 #include "bnb_solver.h"
-
 #include <algorithm>
 #include <chrono>
 #include <limits>
+#include <new>
 #include <stdexcept>
 #include <vector>
-
 #include "../common/utils.h"
 #include "bnb_node.h"
 #include "lb.h"
 #include "ub.h"
-
 namespace {
-    std::vector<int> materializePath(const std::vector<BnBNode>& nodePool, int nodeId) {
-        std::vector<int> reversedPath;
-
-        while (nodeId != -1) {
-            reversedPath.push_back(nodePool[nodeId].current_vertex);
-            nodeId = nodePool[nodeId].parent_index;
-        }
-
-        std::reverse(reversedPath.begin(), reversedPath.end());
-        return reversedPath;
+    std::vector<int> materializePath(const std::vector<BnBNode>& pool,int id){
+        std::vector<int> r; while(id!=-1){r.push_back(pool[id].current_vertex);id=pool[id].parent_index;}
+        std::reverse(r.begin(),r.end()); return r;
     }
-
-    BnBNode createRootNode(const TSPInstance& instance) {
-        BnBNode root;
-        root.visited.assign(instance.dimension, false);
-        root.visited[Config::START_VERTEX] = true;
-        root.parent_index = -1;
-        root.current_vertex = Config::START_VERTEX;
-        root.level = 1;
-        root.partial_cost = 0;
-        root.lower_bound = 0;
-        return root;
+    BnBNode createRoot(const TSPInstance& inst){
+        BnBNode r; r.visited.assign(inst.dimension,false); r.visited[Config::START_VERTEX]=true;
+        r.parent_index=-1;r.current_vertex=Config::START_VERTEX;r.level=1;r.partial_cost=0;r.lower_bound=0;
+        return r;
     }
-
-    BnBNode createChildNode(
-            const TSPInstance& instance,
-            const BnBNode& parent,
-            int parentIndex,
-            int nextVertex
-    ) {
-        BnBNode child = parent;
-        child.parent_index = parentIndex;
-        child.visited[nextVertex] = true;
-        child.partial_cost += instance.distanceMatrix[parent.current_vertex][nextVertex];
-        child.current_vertex = nextVertex;
-        child.level = parent.level + 1;
-        return child;
+    BnBNode createChild(const TSPInstance& inst,const BnBNode& par,int parIdx,int next){
+        BnBNode c=par; c.parent_index=parIdx; c.visited[next]=true;
+        c.partial_cost+=inst.distanceMatrix[par.current_vertex][next];
+        c.current_vertex=next;c.level=par.level+1;
+        return c;
     }
-
-    bool timeLimitReached(
-            const std::chrono::high_resolution_clock::time_point& globalStart,
-            double maxTimeSeconds
-    ) {
-        using clock = std::chrono::high_resolution_clock;
-        const double elapsedSeconds =
-                std::chrono::duration<double>(clock::now() - globalStart).count();
-
-        return elapsedSeconds >= maxTimeSeconds;
+    bool timeLimitReached(const std::chrono::high_resolution_clock::time_point& s,double max){
+        return std::chrono::duration<double>(std::chrono::high_resolution_clock::now()-s).count()>=max;
     }
-
-    void initializeResultBase(
-            TSPResult& result,
-            const TSPInstance& instance,
-            const std::string& algorithmName
-    ) {
-        result.algorithm_name = algorithmName;
-        result.instance_name = instance.name.empty() ? "unknown_instance" : instance.name;
-        result.instance_type = instance.type.empty()
-                               ? (instance.symmetric ? "TSP" : "ATSP")
-                               : instance.type;
-        result.vertex_count = instance.dimension;
-        result.best_cost = std::numeric_limits<int>::max();
-        result.best_path.clear();
-        result.best_path_text.clear();
-        result.ub_from_nn = -1;
-        result.visited_nodes = 0;
-        result.pruned_nodes = 0;
-        result.completed_naturally = true;
-        result.stop_reason = "Zakonczono naturalnie";
+    void initResult(TSPResult& r,const TSPInstance& inst,const std::string& name){
+        r.algorithm_name=name;
+        r.instance_name=inst.name.empty()?"unknown_instance":inst.name;
+        r.instance_type=inst.type.empty()?(inst.symmetric?"TSP":"ATSP"):inst.type;
+        r.vertex_count=inst.dimension; r.best_cost=std::numeric_limits<int>::max();
+        r.best_path.clear();r.best_path_text.clear();r.ub_from_nn=-1;
+        r.visited_nodes=r.pruned_nodes=r.generated_nodes=r.stored_nodes=r.max_frontier_size=r.max_node_pool_size=0;
+        r.memory_exhausted=false;r.completed_naturally=true;r.stop_reason="Zakonczono naturalnie";r.summary_file_name.clear();
     }
 }
-
-TSPResult solveBranchAndBound(
-        const TSPInstance& instance,
-        ISearchFrontier& frontier,
-        const std::string& algorithmName,
-        double maxTimeSeconds
-) {
-    using clock = std::chrono::high_resolution_clock;
-
-    if (!instance.isValid()) {
-        throw std::runtime_error("Instancja jest niepoprawna lub niepelna.");
-    }
-
-    if (instance.dimension < 2) {
-        throw std::runtime_error("Instancja musi miec co najmniej 2 miasta.");
-    }
-
-    TSPResult result;
-    initializeResultBase(result, instance, algorithmName);
-
-//    UpperBoundResult ubResult = computeInitialUpperBoundNN(instance);
-    UpperBoundResult ubResult = computeInitialUpperBoundRNN(instance);
-    result.ub_from_nn = ubResult.cost;
-
-    if (ubResult.path.size() == static_cast<size_t>(instance.dimension)) {
-        result.best_cost = ubResult.cost;
-        result.best_path = ubResult.path;
-    } else {
-        result.best_cost = ubResult.cost;
-        result.best_path.clear();
-    }
-
-    const auto bnbStart = clock::now();
-
-    std::vector<BnBNode> nodePool;
-    nodePool.reserve(100000);
-
-    BnBNode root = createRootNode(instance);
-    root.lower_bound = computeLowerBound(instance, root);
-
-    nodePool.push_back(std::move(root));
-    frontier.push(0, nodePool[0].lower_bound);
-
-    while (!frontier.empty()) {
-        if (timeLimitReached(bnbStart, maxTimeSeconds)) {
-            result.completed_naturally = false;
-            result.stop_reason = "Przekroczono limit czasu";
-            break;
-        }
-
-        const NodeId nodeId = frontier.pop();
-        BnBNode node = nodePool[nodeId];
-        result.visited_nodes++;
-
-        if (node.lower_bound >= result.best_cost) {
-            result.pruned_nodes++;
-            continue;
-        }
-
-        if (node.level == instance.dimension) {
-            const int fullCost = computeCompletionCost(instance, node);
-
-            if (fullCost < result.best_cost) {
-                result.best_cost = fullCost;
-                result.best_path = materializePath(nodePool, nodeId);
-            }
-
-            continue;
-        }
-
-        for (int next = 0; next < instance.dimension; ++next) {
-            if (node.visited[next]) {
+TSPResult solveBranchAndBound(const TSPInstance& inst,ISearchFrontier& frontier,
+                              const std::string& name,double maxTime){
+    using clock=std::chrono::high_resolution_clock;
+    if(!inst.isValid()) throw std::runtime_error("Instancja jest niepoprawna.");
+    if(inst.dimension<2) throw std::runtime_error("Instancja musi miec co najmniej 2 miasta.");
+    TSPResult result; initResult(result,inst,name);
+    auto ub=computeInitialUpperBoundRNN(inst); result.ub_from_nn=ub.cost;
+    if(ub.path.size()==static_cast<size_t>(inst.dimension)){result.best_cost=ub.cost;result.best_path=ub.path;}
+    else result.best_cost=ub.cost;
+    const auto start=clock::now();
+    try {
+        std::vector<BnBNode> pool; pool.reserve(100000);
+        BnBNode root=createRoot(inst); root.lower_bound=computeLowerBound(inst,root);
+        pool.push_back(std::move(root));
+        result.stored_nodes=1;result.max_node_pool_size=1;
+        frontier.push(0,pool[0].lower_bound);
+        result.max_frontier_size=std::max(result.max_frontier_size,(long long)frontier.size());
+        while(!frontier.empty()){
+            if(timeLimitReached(start,maxTime)){result.completed_naturally=false;result.stop_reason="Przekroczono limit czasu";break;}
+            result.max_frontier_size=std::max(result.max_frontier_size,(long long)frontier.size());
+            result.max_node_pool_size=std::max(result.max_node_pool_size,(long long)pool.size());
+            const NodeId id=frontier.pop(); BnBNode node=pool[id]; result.visited_nodes++;
+            if(node.lower_bound>=result.best_cost){result.pruned_nodes++;continue;}
+            if(node.level==inst.dimension){
+                const int fc=computeCompletionCost(inst,node);
+                if(fc<result.best_cost){result.best_cost=fc;result.best_path=materializePath(pool,id);}
                 continue;
             }
-
-            BnBNode child = createChildNode(instance, node, nodeId, next);
-            child.lower_bound = computeLowerBound(instance, child);
-
-            if (child.lower_bound < result.best_cost) {
-                nodePool.push_back(std::move(child));
-                const auto childId = static_cast<NodeId>(nodePool.size() - 1);
-                frontier.push(childId, nodePool[childId].lower_bound);
-            } else {
-                result.pruned_nodes++;
+            for(int next=0;next<inst.dimension;++next){
+                if(node.visited[next]) continue;
+                result.generated_nodes++;
+                BnBNode child=createChild(inst,node,id,next);
+                child.lower_bound=computeLowerBound(inst,child);
+                if(child.lower_bound<result.best_cost){
+                    pool.push_back(std::move(child)); result.stored_nodes++;
+                    result.max_node_pool_size=std::max(result.max_node_pool_size,(long long)pool.size());
+                    NodeId cid=(NodeId)(pool.size()-1);
+                    frontier.push(cid,pool[cid].lower_bound);
+                    result.max_frontier_size=std::max(result.max_frontier_size,(long long)frontier.size());
+                } else result.pruned_nodes++;
             }
         }
-    }
-
-    const auto bnbEnd = clock::now();
-    result.total_time_ms = elapsedMilliseconds(bnbStart, bnbEnd);
-
-    if (!result.best_path.empty() &&
-        result.best_path.size() == static_cast<size_t>(instance.dimension)) {
-        result.best_path_text = pathToString(result.best_path, instance);
-    } else {
-        result.best_cost = -1;
-        result.best_path_text = "Brak pelnej sciezki";
-    }
-
+    } catch(const std::bad_alloc&){result.completed_naturally=false;result.memory_exhausted=true;result.stop_reason="Brak pamieci";}
+    result.total_time_ms=elapsedMilliseconds(start,clock::now());
+    if(!result.best_path.empty()&&result.best_path.size()==static_cast<size_t>(inst.dimension))
+        result.best_path_text=pathToString(result.best_path,inst);
+    else{result.best_cost=-1;result.best_path_text="Brak pelnej sciezki";}
     return result;
 }
