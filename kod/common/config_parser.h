@@ -4,10 +4,6 @@
 
 #include <string>
 
-// ============================================================
-// Typy wyliczeniowe opisujÄ…ce wybory z pliku konfiguracyjnego
-// ============================================================
-
 enum class SearchType {
     DFS,
     BFS,
@@ -20,9 +16,6 @@ enum class AlgorithmType {
     LB_UB_RNN       // z LB (wyliczanym), UB startowe z RNN
 };
 
-// ============================================================
-// Struktura przechowujÄ…ca odczytanÄ… konfiguracjÄ™
-// ============================================================
 
 struct RunConfig {
     std::string instancePath;   // sciezka do pliku instancji
@@ -30,10 +23,6 @@ struct RunConfig {
     AlgorithmType algorithmType = AlgorithmType::LB_UB_RNN;
 };
 
-// ============================================================
-// Funkcja parsujÄ…ca plik konfiguracyjny
-// Rzuca std::runtime_error przy bĹ‚Ä™dach
-// ============================================================
 
 RunConfig parseConfigFile(const std::string& configPath);
 

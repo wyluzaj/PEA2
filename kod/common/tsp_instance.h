@@ -46,7 +46,7 @@ struct TSPResult {
     long long pruned_nodes = 0;        // ile stanow odcieto
     long long generated_nodes = 0;     // ile dzieci rozważono do utworzenia
     long long stored_nodes = 0;        // ile stanow faktycznie trafiło do pamieci
-    long long max_frontier_size = 0;   // maksymalny rozmiar frontier
+    long long max_frontier_size = 0;   // maksymalny rozmiar
     long long max_node_pool_size = 0;  // maksymalny rozmiar puli nodePool
 
     bool memory_exhausted = false;

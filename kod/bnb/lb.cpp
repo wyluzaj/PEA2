@@ -63,9 +63,8 @@ namespace {
 
     // Zwraca kolejnego poprawnego kandydata krawędzi wewnętrznej wychodzącej z "from",
     // korzystając z sortedNeighbors[from].
-    //
     // Dla TSP symetrycznego unikamy duplikatów przez warunek from < to.
-    // Dla ATSP bierzemy wszystkie łuki from -> to, gdzie oba końce są nieodwiedzone.
+    // Dla ATSP bierzemy wszystkie łuki from - to, gdzie oba końce są nieodwiedzone.
     bool getNextInternalCandidate(
             const TSPInstance& instance,
             int from,
@@ -104,13 +103,10 @@ namespace {
 
     // Suma (|U|-1) najmniejszych połączeń wewnątrz zbioru nieodwiedzonych,
     // wyciąganych z list sortedNeighbors, bez pełnego skanowania macierzy.
-    //
-    // Interpretacja:
     // - TSP symetryczne: bierzemy (k-1) najmniejszych krawędzi nieskierowanych w U
     // - ATSP: bierzemy (k-1) najmniejszych łuków skierowanych w U
-    //
-    // To jest przybliżone LB zgodne z ideą slajdu:
-    // "zliczać najmniejsze odległości, które łączą dwa nieodwiedzone węzły".
+    // "zliczać najmniejsze odległości, które łączą dwa nieodwiedzone węzły"
+
     int getInternalResidualBound(
             const TSPInstance& instance,
             const std::vector<int>& unvisited,

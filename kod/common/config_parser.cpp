@@ -4,7 +4,6 @@
 #include <cctype>
 #include <fstream>
 #include <iostream>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 
@@ -148,9 +147,6 @@ RunConfig parseConfigFile(const std::string& configPath) {
     return cfg;
 }
 
-// ============================================================
-// Implementacja printConfig
-// ============================================================
 
 void printConfig(const RunConfig& cfg) {
     auto searchName = [](SearchType t) -> std::string {
