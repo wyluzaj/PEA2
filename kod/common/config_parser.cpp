@@ -6,6 +6,7 @@
 #include <iostream>
 #include <stdexcept>
 #include <string>
+#include "utils.h"
 
 // ============================================================
 // Pomocnicze funkcje lokalne
@@ -29,7 +30,7 @@ namespace {
         return s;
     }
 
-// Usuwa komentarze zaczynajÄ…ce siÄ™ od '#'
+// Usuwa komentarze #
     std::string stripComment(const std::string& line) {
         const size_t pos = line.find('#');
         if (pos == std::string::npos) return line;
@@ -58,7 +59,7 @@ namespace {
         );
     }
 
-} // namespace
+}
 
 // ============================================================
 // Implementacja parseConfigFile
@@ -104,14 +105,10 @@ RunConfig parseConfigFile(const std::string& configPath) {
         }
 
         if (key == "INSTANCE_PATH") {
-            // UsuĹ„ ewentualne cudzysĹ‚owy
-            std::string path = val;
-            if (path.size() >= 2 && path.front() == '"' && path.back() == '"') {
-                path = path.substr(1, path.size() - 2);
-            }
-            cfg.instancePath = path;
+            cfg.instancePath = normalizePath(val);
             gotInstance = true;
         }
+
         else if (key == "SEARCH_TYPE") {
             cfg.searchType = parseSearchType(val, configPath);
             gotSearchType = true;

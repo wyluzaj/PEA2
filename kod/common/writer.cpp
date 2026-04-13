@@ -130,6 +130,6 @@ void printBnBResultToConsole(const TSPResult& result) {
     std::cout << "Powod zakonczenia: " << result.stop_reason << "\n";
 
     if (!result.summary_file_name.empty()) {
-        std::cout << "Plik podgladowy: " << result.summary_file_name << "\n";
+        std::cout << "Plik podgladowy: " << fs::absolute(result.summary_file_name).string() << "\n";
     }
 }
